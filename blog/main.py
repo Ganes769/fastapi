@@ -1,8 +1,10 @@
 from  fastapi import FastAPI,Depends,Response,status,HTTPException
 from .schema import Blog
+from typing import List
 from . import schema,models
 from .database import engine,SessionLocaL
 from sqlalchemy.orm import Session # type: ignore
+from .hash import Hash
 app=FastAPI()
 models.Base.metadata.create_all(engine)
 def get_db():
@@ -19,11 +21,11 @@ def create_blog(blog:schema.Blog,db:Session=Depends(get_db)):
     db.refresh(new_blog)
     return new_blog
 
-@app.get("/blog")
+@app.get("/blog",response_model=List[schema.ShowBlog])
 def get_all_blog(db:Session=Depends(get_db)):
     blogs=db.query(models.Blog).all()
     return blogs
-@app.get("/blog/{id}",status_code=200)
+@app.get("/blog/{id}",status_code=200,response_model=schema.ShowBlog)
 def get__blog(id,response:Response,db:Session=Depends(get_db)):
     blog=db.query(models.Blog).filter(models.Blog.id==id).first()
     if not blog:
@@ -51,7 +53,16 @@ def updtae(id,request:schema.Blog,db:Session=Depends(get_db)):
     db.commit()
     return {"blog updtated  "}
     
-    
-        
-    
-
+@app.post("/user",response_model=schema.ShowUser)
+def create_user(request:schema.User,db:Session=Depends(get_db)):
+    new_user=models.User(name=request.name,email=request.email,password=Hash.bcryptpwd(request.password))
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+@app.get("/user/{id}",response_model=schema.ShowUser)
+def getUser(id:int,db:Session=Depends(get_db)):
+    user=db.query(models.User).filter(models.User.id==id).first()
+    if not user:
+        raise HTTPException (status_code=status.HTTP_404_NOT_FOUND,detail=f"user not found with the {id}")
+    return user
